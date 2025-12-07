@@ -19,6 +19,7 @@ export interface AnalysisResult {
   deepDive: string[];
   realityCheck: string;
   healingRoadmap: string[];
+  isImageFallback?: boolean;
 }
 
 export enum AppState {

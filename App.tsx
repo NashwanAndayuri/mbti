@@ -1,8 +1,7 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { AnalysisResult, AppState } from './types';
 import { QUESTIONS } from './constants';
-import { getAnalysisAndImage } from './services/geminiService';
+import { getAnalysisAndImage, generateVisualAnchor } from './services/geminiService';
 import MentalHealthChart from './components/MentalHealthChart';
 import { SendIcon, SparklesIcon, RestartIcon, EyeIcon, AlertIcon, MapIcon } from './components/Icons';
 
@@ -10,19 +9,23 @@ const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.WELCOME);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<string[]>([]);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [showVisualDescription, setShowVisualDescription] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const processFinalAnalysis = useCallback(async () => {
     setIsLoading(true);
+    setErrorMessage(null);
     try {
       const result = await getAnalysisAndImage(userAnswers);
       setAnalysisResult(result);
       setAppState(AppState.RESULTS);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error during final analysis:", error);
+      setErrorMessage(error.message || "An unexpected error occurred.");
       setAppState(AppState.ERROR);
     } finally {
       setIsLoading(false);
@@ -31,6 +34,25 @@ const App: React.FC = () => {
 
   const handleStart = () => {
     setAppState(AppState.IN_PROGRESS);
+  };
+
+  const handleRetryImage = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent the card from toggling description
+    if (!analysisResult) return;
+
+    setIsImageLoading(true);
+    try {
+        const newImageUrl = await generateVisualAnchor(analysisResult.theme);
+        setAnalysisResult({
+            ...analysisResult,
+            imageUrl: newImageUrl,
+            isImageFallback: false
+        });
+    } catch (error: any) {
+        alert("Still hitting traffic limits. Give it 30 seconds and try again!");
+    } finally {
+        setIsImageLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,6 +92,7 @@ const App: React.FC = () => {
     setUserAnswers([]);
     setAnalysisResult(null);
     setShowVisualDescription(false);
+    setErrorMessage(null);
   };
   
   const renderContent = () => {
@@ -294,8 +317,8 @@ const App: React.FC = () => {
 
                 {/* 3. Interactive Visual Anchor */}
                 <div 
-                  onClick={() => setShowVisualDescription(!showVisualDescription)}
-                  className="relative w-full aspect-video md:aspect-[2.5/1] overflow-hidden rounded-[2rem] shadow-2xl group cursor-pointer mt-12"
+                  onClick={() => !analysisResult.isImageFallback && setShowVisualDescription(!showVisualDescription)}
+                  className={`relative w-full aspect-video md:aspect-[2.5/1] overflow-hidden rounded-[2rem] shadow-2xl group mt-12 ${!analysisResult.isImageFallback ? 'cursor-pointer' : ''}`}
                 >
                   <img 
                     src={analysisResult.imageUrl} 
@@ -313,20 +336,47 @@ const App: React.FC = () => {
                         <p className="text-white/90 text-xs font-bold uppercase tracking-[0.3em]">Visual Anchor</p>
                       </div>
                       <h3 className="text-white text-3xl md:text-5xl font-medium italic tracking-wide">{analysisResult.theme}</h3>
-                      <p className="text-white/60 text-xs mt-4 uppercase tracking-widest flex items-center gap-2">
-                        <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                        Tap image to interpret
-                      </p>
+                      {!analysisResult.isImageFallback && (
+                        <p className="text-white/60 text-xs mt-4 uppercase tracking-widest flex items-center gap-2">
+                            <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                            Tap image to interpret
+                        </p>
+                      )}
                   </div>
 
+                  {/* Fallback Retry Button Overlay */}
+                  {analysisResult.isImageFallback && (
+                      <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/40 backdrop-blur-sm">
+                          <button 
+                            onClick={handleRetryImage}
+                            disabled={isImageLoading}
+                            className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-md border border-white/20 px-8 py-4 rounded-full font-bold flex items-center gap-3 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isImageLoading ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                    <span>Generating...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <SparklesIcon className="w-5 h-5" />
+                                    <span>Generate Visualization</span>
+                                </>
+                            )}
+                          </button>
+                      </div>
+                  )}
+
                   {/* Active Overlay (Shown when clicked) */}
-                  <div className={`absolute inset-0 bg-black/40 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center transition-all duration-500 ${showVisualDescription ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
-                      <h4 className="text-white text-2xl font-bold mb-6 tracking-tight border-b border-white/20 pb-4">Visual Interpretation</h4>
-                      <p className="text-white text-lg md:text-2xl font-medium leading-relaxed max-w-3xl italic">
-                        "{analysisResult.visualDescription}"
-                      </p>
-                      <p className="text-white/40 text-xs mt-8 uppercase tracking-widest hover:text-white transition-colors">Tap to close</p>
-                  </div>
+                  {!analysisResult.isImageFallback && (
+                    <div className={`absolute inset-0 bg-black/40 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center transition-all duration-500 ${showVisualDescription ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
+                        <h4 className="text-white text-2xl font-bold mb-6 tracking-tight border-b border-white/20 pb-4">Visual Interpretation</h4>
+                        <p className="text-white text-lg md:text-2xl font-medium leading-relaxed max-w-3xl italic">
+                            "{analysisResult.visualDescription}"
+                        </p>
+                        <p className="text-white/40 text-xs mt-8 uppercase tracking-widest hover:text-white transition-colors">Tap to close</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-center pt-8">
@@ -342,7 +392,12 @@ const App: React.FC = () => {
               </div>
             ) : (
                 <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                    <p className="text-red-500 text-lg mb-4">We hit a snag generating your analysis. It happens!</p>
+                    <p className="text-red-500 text-lg mb-2">We hit a snag generating your analysis.</p>
+                    {errorMessage && (
+                        <p className="text-gray-500 text-sm mb-6 bg-gray-100 dark:bg-gray-800 p-3 rounded-lg max-w-md font-mono">
+                            {errorMessage}
+                        </p>
+                    )}
                     <button onClick={handleRestart} className="px-6 py-2 bg-indigo-600 text-white rounded-full font-medium hover:bg-indigo-700">Try Again</button>
                 </div>
             )}
