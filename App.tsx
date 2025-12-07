@@ -36,6 +36,11 @@ const App: React.FC = () => {
     setAppState(AppState.IN_PROGRESS);
   };
 
+  const handleRetryAnalysis = () => {
+    // Retry triggering the analysis state without clearing answers
+    setAppState(AppState.ANALYZING);
+  };
+
   const handleRetryImage = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent the card from toggling description
     if (!analysisResult) return;
@@ -220,10 +225,9 @@ const App: React.FC = () => {
         );
       
       case AppState.RESULTS:
-      case AppState.ERROR:
         return (
           <div className="h-full overflow-y-auto bg-gray-50/50 dark:bg-gray-900/50 scroll-smooth backdrop-blur-sm">
-            {analysisResult ? (
+            {analysisResult && (
               <div className="max-w-5xl mx-auto p-6 md:p-12 space-y-8 pb-24">
                 
                 {/* Header */}
@@ -390,18 +394,44 @@ const App: React.FC = () => {
                 </div>
 
               </div>
-            ) : (
-                <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                    <p className="text-red-500 text-lg mb-2">We hit a snag generating your analysis.</p>
-                    {errorMessage && (
-                        <p className="text-gray-500 text-sm mb-6 bg-gray-100 dark:bg-gray-800 p-3 rounded-lg max-w-md font-mono">
-                            {errorMessage}
-                        </p>
-                    )}
-                    <button onClick={handleRestart} className="px-6 py-2 bg-indigo-600 text-white rounded-full font-medium hover:bg-indigo-700">Try Again</button>
-                </div>
             )}
           </div>
+        );
+
+      case AppState.ERROR:
+        return (
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-full mb-6">
+                    <AlertIcon className="w-12 h-12 text-red-500" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">We hit a snag</h2>
+                <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md">
+                    The AI models are currently overwhelmed or a connection error occurred. Don't worry, your answers are safe!
+                </p>
+                {errorMessage && (
+                    <div className="w-full max-w-lg bg-gray-100 dark:bg-gray-800 p-4 rounded-xl mb-8 overflow-auto max-h-40 text-left border border-gray-200 dark:border-gray-700">
+                        <p className="font-mono text-xs text-red-600 dark:text-red-400 break-words">
+                            {errorMessage}
+                        </p>
+                    </div>
+                )}
+                
+                <div className="flex flex-col gap-4 w-full max-w-xs">
+                    <button
+                        onClick={handleRetryAnalysis}
+                        className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 hover:scale-105 transition-all shadow-xl shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-3"
+                    >
+                        <SparklesIcon className="w-5 h-5" />
+                        Retry Analysis
+                    </button>
+                    <button
+                        onClick={handleRestart}
+                        className="px-8 py-4 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
+                    >
+                        Start Over
+                    </button>
+                </div>
+            </div>
         );
     }
   };

@@ -38,6 +38,9 @@ const analysisSchema = {
 // A fallback abstract gradient image (Base64 SVG) to use when image generation quota is exceeded
 const FALLBACK_IMAGE = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDI0IiBoZWlnaHQ9IjEwMjQiIHZpZXdCb3g9IjAgMCAxMDI0IDEwMjQiPjxkZWZzPjxsaW5lYXJHcmFkaWVudCBpZD0iZ3JhZCIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3R5bGU9InN0b3AtY29sb3I6IzQzMzhjYTtzdG9wLW9wYWNpdHk6MSIgLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiM2ZDI4ZDk7c3RvcC1vcGFjaXR5OjEiIC8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMjQiIGhlaWdodD0iMTAyNCIgZmlsbD0idXJsKCNncmFkKSIgLz48ZyBvcGFjaXR5PSIwLjEiPjxjaXJjbGUgY3g9IjUxMiIgY3k9IjUxMiIgcj0iMzAwIiBmaWxsPSJ3aGl0ZSIvPjwvZz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IndoaXRlIiBvcGFjaXR5PSIwLjUiPihWaXN1YWxpemF0aW9uIFVuYXZhaWxhYmxlKQ0KPC90ZXh0Pjwvc3ZnPg==";
 
+// Utility for delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 /**
  * Generates the visual anchor image based on the theme.
  * Can be called independently for retries.
@@ -90,7 +93,9 @@ export const getAnalysisAndImage = async (answers: string[]): Promise<AnalysisRe
       analysisData = JSON.parse(result.text);
     }
   } catch (error) {
-    console.warn("Primary model failed (likely quota), failing over to Flash model...", error);
+    console.warn("Primary model failed (likely quota), waiting 2s then failing over to Flash model...", error);
+    // Add a small delay to let the rate limit window reset slightly before hitting the fallback
+    await delay(2000);
   }
 
   // 2. Fallback to Flash model if primary failed (Handles 429 Quota Exceeded)
